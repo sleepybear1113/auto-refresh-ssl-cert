@@ -16,9 +16,9 @@ public class TencentCloudPlatformApi implements CloudPlatformApi {
     public List<PlatformSslCertInfo> getCertInfoList(CloudApiKey apiKey) throws Exception {
         List<PlatformSslCertInfo> list = new ArrayList<>();
 
-        List<TencentCloudApi.DescribeCertificatesResponse.CertificateSet> certificates = TencentCloudApi.describeCertificates(new TencentCloudApi.QueryParams(), apiKey.getSecretId(), apiKey.getSecretKey());
+        List<TencentCloudApi.DescribeCertificatesResponse.Certificates> certificates = TencentCloudApi.describeCertificates(new TencentCloudApi.QueryParams(), apiKey.getSecretId(), apiKey.getSecretKey());
 
-        for (TencentCloudApi.DescribeCertificatesResponse.CertificateSet certificate : certificates) {
+        for (TencentCloudApi.DescribeCertificatesResponse.Certificates certificate : certificates) {
             PlatformSslCertInfo config = new PlatformSslCertInfo();
             config.setId(certificate.getCertificateId());
             config.setCloudPlatform("tencent");
