@@ -17,6 +17,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
@@ -43,12 +45,31 @@ public class TencentCloudApi {
 
         CloudApiKey apiKey = cloudApiKeys.getFirst();
 
+//        testList(apiKey);
+        testDownload(apiKey);
+    }
+
+    public static void testList(CloudApiKey apiKey ) throws Exception {
         DescribeCertificatesQuery queryParams = new DescribeCertificatesQuery();
         queryParams.setOffset(0);
         queryParams.setLimit(10);
 
         List<DescribeCertificatesResponse.Certificates> certificates = describeCertificates(queryParams, apiKey.getSecretId(), apiKey.getSecretKey());
         certificates.forEach(o -> System.out.println(GSON.toJson(o)));
+    }
+
+    public static void testDownload(CloudApiKey apiKey)  throws Exception {
+        DescribeDownloadCertificateUrlQuery queryParams = new DescribeDownloadCertificateUrlQuery();
+        String id = "NAEngsSV";
+        queryParams.setCertificateId(id);
+        queryParams.setServiceType("nginx");
+        DescribeDownloadCertificateUrlResponse response = describeDownloadCertificateUrl(queryParams, apiKey.getSecretId(), apiKey.getSecretKey());
+        if (response.getError() != null) {
+            System.out.println("错误: " + response.getError().getMessage());
+        } else {
+            System.out.println("证书文件: " + response.getDownloadFilename());
+            System.out.println("证书链接: " + response.getDownloadCertificateUrl());
+        }
     }
 
     public static List<DescribeCertificatesResponse.Certificates> describeCertificates(QueryParams params, String secretId, String secretKey) throws Exception {
@@ -73,6 +94,19 @@ public class TencentCloudApi {
         }
 
         return new ArrayList<>(List.of(describeCertificatesResponse.getCertificates()));
+    }
+
+    public static DescribeDownloadCertificateUrlResponse describeDownloadCertificateUrl(DescribeDownloadCertificateUrlQuery params, String secretId, String secretKey) throws Exception {
+        String service = "ssl";
+        String endpoint = service + ".tencentcloudapi.com";
+        String action = "DescribeDownloadCertificateUrl";
+
+        String payload = params.toJson();
+
+        Map<String, String> headers = buildHeaders(action, secretId, secretKey, service, endpoint, payload);
+
+        JsonElement jsonElement = sendRequest(payload, headers, endpoint);
+        return GSON.fromJson(jsonElement, DescribeDownloadCertificateUrlResponse.class);
     }
 
     private static String buildCanonicalRequest(String endPoint, String payload) {
@@ -177,6 +211,26 @@ public class TencentCloudApi {
         }
     }
 
+    public static void downloadFile(String url, String toFile) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
+
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() == 200) {
+                Files.write(Paths.get(toFile), response.body());
+                System.out.println("文件下载成功: " + toFile);
+            } else {
+                System.out.println("下载失败，状态码: " + response.statusCode());
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     @EqualsAndHashCode(callSuper = true)
     @Data
     public static class DescribeCertificatesQuery extends QueryParams {
@@ -186,6 +240,15 @@ public class TencentCloudApi {
         private Integer limit;
         @SerializedName("SearchKey")
         private String searchKey;
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static class DescribeDownloadCertificateUrlQuery extends QueryParams {
+        @SerializedName("CertificateId")
+        private String certificateId;
+        @SerializedName("ServiceType")
+        private String serviceType;
     }
 
     @Data
@@ -226,5 +289,12 @@ public class TencentCloudApi {
             private String ExpireTime;
             // 根据实际返回字段继续补充
         }
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static class DescribeDownloadCertificateUrlResponse extends BaseResponse {
+        private String DownloadCertificateUrl;
+        private String DownloadFilename;
     }
 }
