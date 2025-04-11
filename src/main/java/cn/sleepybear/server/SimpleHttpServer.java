@@ -18,34 +18,56 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class SimpleHttpServer {
-    private final int port;
     private final CertService certService;
-    private final HttpServer server;
 
-    public SimpleHttpServer(int port, CertService certService) throws IOException {
-        this.port = port;
+    private HttpServer server;
+
+    private Boolean isRunning = false;
+
+    public SimpleHttpServer(CertService certService) {
         this.certService = certService;
-
-        // 创建HTTP服务器
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
-
-        // 设置线程池
-        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-
-        // 注册API路径
-        server.createContext("/api/getConfigJson", new GetConfigJsonHandler());
-        server.createContext("/api/refreshLocalSslCert", new RefreshLocalSslCertHandler());
-        server.createContext("/api/getTencentCerts", new GetTencentCertsHandler());
     }
 
-    public void start() {
-        server.start();
+    public void start(int port) {
+        if (isRunning) {
+            LogUtil.warn("HTTP 服务器已经在运行中，无法重复启动");
+            return;
+        }
+
+        if (CommonUtils.isPortInUse(port)) {
+            LogUtil.warn("端口 %s 已被占用, HTTP 服务器将不启动!".formatted(port));
+            return;
+        }
+
+        // 创建 HTTP 服务器
+        try {
+            this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        } catch (IOException e) {
+            LogUtil.error("创建HTTP服务器失败，端口 %s 可能被占用".formatted(port), e);
+            return;
+        }
+
+        // 设置线程池
+        this.server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+
+        // 注册 API 路径
+        this.server.createContext("/api/getConfigJson", new GetConfigJsonHandler());
+        this.server.createContext("/api/refreshLocalSslCert", new RefreshLocalSslCertHandler());
+        this.server.createContext("/api/getTencentCerts", new GetTencentCertsHandler());
+
+        this.server.start();
         LogUtil.info("HTTP 服务器已启动，运行于端口 %s".formatted(port));
+        isRunning = true;
     }
 
     public void stop() {
-        server.stop(0);
+        if (!isRunning) {
+            LogUtil.warn("HTTP 服务器未运行，无法停止");
+            return;
+        }
+        this.server.stop(0);
         LogUtil.info("HTTP 服务器已经停止");
+        isRunning = false;
     }
 
     private class GetConfigJsonHandler implements HttpHandler {

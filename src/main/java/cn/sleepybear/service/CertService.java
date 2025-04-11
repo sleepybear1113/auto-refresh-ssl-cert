@@ -1,7 +1,6 @@
 package cn.sleepybear.service;
 
 import cn.sleepybear.App;
-import cn.sleepybear.config.SslCertConfig;
 import cn.sleepybear.model.CertInfo;
 import cn.sleepybear.model.CloudApiKey;
 import cn.sleepybear.model.CloudPlatformActionBase;
@@ -193,15 +192,15 @@ public class CertService {
     }
 
     public void updateConfigWithLocalCerts(Map<String, CertInfo> certMap) {
-        List<SslCertConfig> existingConfigs = App.appConfig.getSslCertConfig();
-        Map<String, SslCertConfig> existingConfigMap = existingConfigs.stream()
-                .collect(Collectors.toMap(SslCertConfig::getDomain, config -> config, (a, b) -> a));
+        List<PlatformSslCertInfo> existingConfigs = App.appConfig.getPlatformSslCertInfos();
+        Map<String, PlatformSslCertInfo> existingConfigMap = existingConfigs.stream()
+                .collect(Collectors.toMap(PlatformSslCertInfo::getDomain, config -> config, (a, b) -> a));
 
         for (Map.Entry<String, CertInfo> entry : certMap.entrySet()) {
             String domain = entry.getKey();
             CertInfo certInfo = entry.getValue();
 
-            SslCertConfig config = existingConfigMap.getOrDefault(domain, new SslCertConfig());
+            PlatformSslCertInfo config = existingConfigMap.getOrDefault(domain, new PlatformSslCertInfo());
             config.setDomain(domain);
 
             // 设置路径信息
@@ -210,19 +209,17 @@ public class CertService {
             config.setCrtFilename(certInfo.getCrtFile().getName());
             config.setExpireTimeAt(certInfo.getExpireTimeAt());
 
-            // 如果是新配置，添加UUID并设置默认值
+            // 如果是新配置，添加 id 并设置默认值
             if (!existingConfigMap.containsKey(domain)) {
-                config.setId(UUID.randomUUID().toString());
-                config.setValidDays(90);
-                config.setEnable(true);
-                config.setUpdatePolicy(3);
+                config.setId(CommonUtils.randomString(8));
+                config.setEnable(false);
                 existingConfigs.add(config);
             }
 
             existingConfigMap.put(domain, config);
         }
 
-        App.appConfig.setSslCertConfig(new ArrayList<>(existingConfigMap.values()));
+        App.appConfig.setPlatformSslCertInfos(new ArrayList<>(existingConfigMap.values()));
         App.appConfig.save();
     }
 
@@ -232,8 +229,8 @@ public class CertService {
             return;
         }
 
-        List<SslCertConfig> existingConfigs = App.appConfig.getSslCertConfig();
-        Map<String, SslCertConfig> existingConfigMap = existingConfigs.stream().collect(Collectors.toMap(SslCertConfig::getDomain, config -> config, (a, b) -> a));
+        List<PlatformSslCertInfo> existingConfigs = App.appConfig.getPlatformSslCertInfos();
+        Map<String, PlatformSslCertInfo> existingConfigMap = existingConfigs.stream().collect(Collectors.toMap(PlatformSslCertInfo::getDomain, config -> config, (a, b) -> a));
 
         for (CloudApiKey apiKey : apiKeys) {
             try {
@@ -241,7 +238,7 @@ public class CertService {
                 List<PlatformSslCertInfo> certInfoList = cloudPlatformActionBase.getCertInfoList(apiKey);
                 for (PlatformSslCertInfo certInfo : certInfoList) {
                     String domain = certInfo.getDomain();
-                    SslCertConfig config = existingConfigMap.getOrDefault(domain, new SslCertConfig());
+                    PlatformSslCertInfo config = existingConfigMap.getOrDefault(domain, new PlatformSslCertInfo());
                     config.setDomain(domain);
                     config.setCertId(certInfo.getCertId());
                     config.setCertStatus(certInfo.getCertStatus());
@@ -252,9 +249,7 @@ public class CertService {
                     // 如果是新配置，添加 id 并设置默认值
                     if (!existingConfigMap.containsKey(domain)) {
                         config.setId(CommonUtils.randomString(8));
-                        config.setValidDays(90);
-                        config.setEnable(true);
-                        config.setUpdatePolicy(3);
+                        config.setEnable(false);
                         existingConfigs.add(config);
                     }
 
@@ -265,7 +260,7 @@ public class CertService {
             }
         }
 
-        App.appConfig.setSslCertConfig(new ArrayList<>(existingConfigMap.values()));
+        App.appConfig.setPlatformSslCertInfos(new ArrayList<>(existingConfigMap.values()));
         App.appConfig.save();
     }
 

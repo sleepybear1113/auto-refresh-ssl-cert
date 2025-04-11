@@ -45,20 +45,24 @@ public class TencentCloudApi {
 
         CloudApiKey apiKey = cloudApiKeys.getFirst();
 
-//        testList(apiKey);
-        testDownload(apiKey);
+        testList(apiKey);
+//        testDownload(apiKey);
     }
 
-    public static void testList(CloudApiKey apiKey ) throws Exception {
+    public static void testList(CloudApiKey apiKey) throws Exception {
         DescribeCertificatesQuery queryParams = new DescribeCertificatesQuery();
         queryParams.setOffset(0);
         queryParams.setLimit(10);
 
-        List<DescribeCertificatesResponse.Certificates> certificates = describeCertificates(queryParams, apiKey.getSecretId(), apiKey.getSecretKey());
-        certificates.forEach(o -> System.out.println(GSON.toJson(o)));
+        DescribeCertificatesResponse describeCertificatesResponse = describeCertificates(queryParams, apiKey.getSecretId(), apiKey.getSecretKey());
+        if (describeCertificatesResponse == null || describeCertificatesResponse.getError() != null) {
+            System.out.println("错误: " + (describeCertificatesResponse != null ? describeCertificatesResponse.getError().getMessage() : ""));
+            return;
+        }
+        describeCertificatesResponse.getCertificates().forEach(o -> System.out.println(GSON.toJson(o)));
     }
 
-    public static void testDownload(CloudApiKey apiKey)  throws Exception {
+    public static void testDownload(CloudApiKey apiKey) throws Exception {
         DescribeDownloadCertificateUrlQuery queryParams = new DescribeDownloadCertificateUrlQuery();
         String id = "NAEngsSV";
         queryParams.setCertificateId(id);
@@ -72,7 +76,7 @@ public class TencentCloudApi {
         }
     }
 
-    public static List<DescribeCertificatesResponse.Certificates> describeCertificates(QueryParams params, String secretId, String secretKey) throws Exception {
+    public static DescribeCertificatesResponse describeCertificates(QueryParams params, String secretId, String secretKey) throws Exception {
         String service = "ssl";
         String endpoint = service + ".tencentcloudapi.com";
         String action = "DescribeCertificates";
@@ -85,15 +89,10 @@ public class TencentCloudApi {
         DescribeCertificatesResponse describeCertificatesResponse = GSON.fromJson(jsonElement, DescribeCertificatesResponse.class);
         if (describeCertificatesResponse == null) {
             System.out.println("响应体为空");
-            return new ArrayList<>();
+            return null;
         }
 
-        if (describeCertificatesResponse.getCertificates() == null || describeCertificatesResponse.getCertificates().length == 0) {
-            System.out.println("没有解析到证书");
-            return new ArrayList<>();
-        }
-
-        return new ArrayList<>(List.of(describeCertificatesResponse.getCertificates()));
+        return describeCertificatesResponse;
     }
 
     public static DescribeDownloadCertificateUrlResponse describeDownloadCertificateUrl(DescribeDownloadCertificateUrlQuery params, String secretId, String secretKey) throws Exception {
@@ -238,8 +237,37 @@ public class TencentCloudApi {
         private Integer offset;
         @SerializedName("Limit")
         private Integer limit;
+
+        /**
+         * 数组，证书 ID 数组，传入后只返回该证书 ID 的证书信息，如["FxG06njc"]
+         */
+        @SerializedName("CertIds")
+        private List<String> CertIds;
+
+        /**
+         * 搜索关键词，模糊匹配证书 ID、备注名称、证书域名
+         */
         @SerializedName("SearchKey")
         private String searchKey;
+
+        /**
+         * 默认按照证书申请时间降序； 若传排序则按到期时间排序：DESC = 证书到期时间降序， ASC = 证书到期时间升序。示例值：DESC
+         */
+        @SerializedName("ExpirationSort")
+        private String expirationSort;
+
+        /**
+         * 数组，证书状态：0 = 审核中，1 = 已通过，2 = 审核失败，3 = 已过期，4 = 已添加DNS记录，5 = 企业证书，待提交，6 = 订单取消中，7 = 已取消，8 = 已提交资料， 待上传确认函，9 = 证书吊销中，10 = 已吊销，11 = 重颁发中，12 = 待上传吊销确认函，13 = 免费证书待提交资料。14 = 已退款。 15 = 证书迁移中
+         * <br>示例值：[1]
+         */
+        @SerializedName("CertificateStatus")
+        private List<String> certificateStatus;
+
+        /**
+         * 筛选来源， upload：上传证书， buy：腾讯云证书， 不传默认全部
+         */
+        @SerializedName("FilterSource")
+        private String filterSource;
     }
 
     @EqualsAndHashCode(callSuper = true)
@@ -274,20 +302,60 @@ public class TencentCloudApi {
     @EqualsAndHashCode(callSuper = true)
     @Data
     public static class DescribeCertificatesResponse extends BaseResponse {
-        private Certificates[] Certificates;
+        private List<Certificates> Certificates;
         private Integer TotalCount;
 
         @Data
         public static class Certificates {
+            private String OwnerUin;
+            private String Domain;
             private String CertificateId;
+
+            /**
+             * 证书来源：
+             * trustasia：亚洲诚信，
+             * upload：用户上传。
+             * wosign：沃通
+             * sheca：上海CA
+             */
+            private String From;
+
+            /**
+             * 备注
+             */
             private String Alias;
-            private String Type;
+
+            /**
+             * 证书状态：0 = 审核中，1 = 已通过，2 = 审核失败，3 = 已过期，4 = 自动添加DNS记录，5 = 企业证书，待提交资料，6 = 订单取消中，7 = 已取消，8 = 已提交资料， 待上传确认函，9 = 证书吊销中，10 = 已吊销，11 = 重颁发中，12 = 待上传吊销确认函，13 = 免费证书待提交资料。14 = 证书已退款。 15 = 证书迁移中
+             */
             private String Status;
-            private String Source;
-            private String CreateTime;
-            private String StartTime;
-            private String ExpireTime;
-            // 根据实际返回字段继续补充
+            private String StatusName;
+            private String StatusMsg;
+
+            /**
+             * 验证类型：DNS_AUTO = 自动DNS验证，DNS = 手动DNS验证，FILE = 文件验证，DNS_PROXY = DNS代理验证。FILE_PROXY = 文件代理验证
+             */
+            private String VerifyType;
+
+            /**
+             * 证书生效时间。示例值：2018-09-18 20:00:00
+             */
+            private String CertBeginTime;
+            private String CertEndTime;
+            /**
+             * 创建时间
+             */
+            private String InsertTime;
+
+            /**
+             * 证书有效期，单位（月）
+             */
+            private Integer ValidityPeriod;
+
+            /**
+             * 是否已忽略到期通知
+             */
+            private Boolean IsIgnore;
         }
     }
 

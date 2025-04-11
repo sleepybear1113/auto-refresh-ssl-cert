@@ -1,5 +1,6 @@
 package cn.sleepybear.config;
 
+import cn.sleepybear.model.PlatformSslCertInfo;
 import cn.sleepybear.util.CommonUtils;
 import cn.sleepybear.util.LogUtil;
 import lombok.Data;
@@ -13,14 +14,32 @@ import java.util.List;
 
 @Data
 public class AppConfig {
+    /**
+     * 配置文件的路径，这个需要在程序启动时指定，若果没有指定，则使用默认的配置文件路径
+     */
+    private String configPath = "data/config.json";
 
-    // 默认配置
-    private String configPath = "config.json";
     private Integer port = 30900;
-    private String keyTextFile = "key.txt";
-    private Integer sslCertPathMaxDepth = 3;
+    private Boolean runServer = true;
+
+    /**
+     * 存放本地云平台 API 密钥的文件路径
+     */
+    private String keyTextFile = "data/key.txt";
+
+    private String logPath = "data/logs";
+    private Boolean enableLogToFile = false;
+
+    /**
+     * 需要扫描的本地的证书的路径列表
+     */
     private List<String> sslCertPathList = new ArrayList<>();
-    private List<SslCertConfig> sslCertConfig = new ArrayList<>();
+    /**
+     * 本地证书路径扫描的最大深度，默认 2 层
+     */
+    private Integer sslCertPathMaxDepth = 2;
+
+    private List<PlatformSslCertInfo> platformSslCertInfos = new ArrayList<>();
 
     public static AppConfig load(String configPath) {
         File configFile = new File(configPath);
